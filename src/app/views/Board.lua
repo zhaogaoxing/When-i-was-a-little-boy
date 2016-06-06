@@ -99,19 +99,19 @@ end
 function Board:onTouch(event, x, y)
     if event ~= "began" or self.flipAnimationCount > 0 then return end
 
-    local padding = NODE_PADDING / 2
-    for _, coin in ipairs(self.coins) do
-        local cx, cy = coin:getPosition()
-        cx = cx + display.cx
-        cy = cy + display.cy
-        if x >= cx - padding
-            and x <= cx + padding
-            and y >= cy - padding
-            and y <= cy + padding then
-            self:flipCoin(coin, true)
-            break
-        end
-    end
+    -- local padding = NODE_PADDING / 2
+    -- for _, coin in ipairs(self.coins) do
+    --     local cx, cy = coin:getPosition()
+    --     cx = cx + display.cx
+    --     cy = cy + display.cy
+    --     if x >= cx - padding
+    --         and x <= cx + padding
+    --         and y >= cy - padding
+    --         and y <= cy + padding then
+    --         self:flipCoin(coin, true)
+    --         break
+    --     end
+    -- end
 end
 
 function Board:onEnter()
