@@ -10,9 +10,6 @@ function MenuScene:ctor()
     self.bg = display.newSprite("tu2.jpg",display.cx, display.cy)
     self:addChild(self.bg)
 
-    self.adBar = AdBar.new()
-    self:addChild(self.adBar)
-
     self.moreGamesButton = BubbleButton.new({
             image = "#MenuSceneMoreGamesButton.png",
             sound = GAME_SFX.tapButton,

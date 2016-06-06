@@ -1,5 +1,5 @@
 
-local Levels = import("..data.Levels")
+local Levels = import("..data.MyLevels")
 
 local Coin = class("Coin", function(nodeType)
     local index = 1
