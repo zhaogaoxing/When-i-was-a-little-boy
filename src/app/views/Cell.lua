@@ -1,17 +1,17 @@
 
 local Levels = import("..data.MyLevels")
 
-local Coin = class("Coin", function(nodeType)
+local Cell = class("Cell", function(nodeType)
     local index = 1
     -- if nodeType == Levels.NODE_IS_BLACK then
     --     index = 8
     -- end
-    local sprite = display.newSprite(string.format("fanfan2.png", index))
+    local sprite = display.newSprite("fanfan2.png")
     sprite.isWhite = index == 1
     return sprite
 end)
 
-function Coin:flip(onComplete)
+function Cell:flip(onComplete)
     local frames = display.newFrames("fanfan2.png", 1, 8, not self.isWhite)
     local animation = display.newAnimation(frames, 0.3 / 8)
     self:playAnimationOnce(animation, false, onComplete)
@@ -37,4 +37,4 @@ function Coin:flip(onComplete)
     self.isWhite = not self.isWhite
 end
 
-return Coin
+return Cell
