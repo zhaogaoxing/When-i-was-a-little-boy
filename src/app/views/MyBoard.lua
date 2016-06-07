@@ -13,6 +13,7 @@ local COIN_ZORDER    = 1000
 
 function Board:ctor(levelData)
     cc.GameObject.extend(self):addComponent("components.behavior.EventProtocol"):exportMethods()
+    math.randomseed(tostring(os.time()):reverse():sub(1,6))
 
     self.batch = display.newNode()
     self.batch:setPosition(display.cx, display.cy)
