@@ -88,7 +88,7 @@ function Board:ctor(levelData)
     self:addNodeEventListener(cc.NODE_TOUCH_EVENT, function(event)
         return self:onTouch(event.name, event.x, event.y)
     end)
-    self:Check()
+    self:checkXie2()
 end
 
 -- function Board:FindCells()
@@ -205,6 +205,57 @@ function Board:Check()
     end
 end
 
+function Board:checkXie2()
+    local i = 1
+    local j = 1
+    while i<= self.rows do
+        j = 1
+        while j<= self.cols do
+            local cell = self.grid[i][j]
+            local sum = 1
+            while j<self.cols and i<self.rows and cell.nodeType == self.grid[i+1][j+1].nodeType do
+                cell = self.grid[i+1][j+1]
+                j = j + 1
+                i = i + 1    
+                sum = sum + 1
+            end
+            if sum >= 3 then
+                print(i,j)
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+end
+
+function Board:checkXie()
+    for i=1,self.rows-2 do
+        for j=1,self.cols-2 do
+            local cell = self.grid[i][j]
+            -- print("he",cell.row,cell.col)
+            local cell_one = self.grid[i+1][j+1]
+            local cell_two = self.grid[i+2][j+2]
+            if cell.nodeType == cell_one.nodeType and
+                cell.nodeType == cell_two.nodeType then
+                print("he",i,j)
+            end
+        end 
+    end
+    local i = self.rows
+    while i >= 4  do
+        i = i - 1
+        for j=1,self.cols-2 do
+            local cell = self.grid[i][j]
+            -- print("he",cell.row,cell.col)
+            local cell_one = self.grid[i-1][j+1]
+            local cell_two = self.grid[i-2][j+2]
+            if cell.nodeType == cell_one.nodeType and
+                cell.nodeType == cell_two.nodeType then
+                print("he",i,j)
+            end
+        end 
+    end
+end
 
 function Board:checkLevelCompleted()
     local count = 0
