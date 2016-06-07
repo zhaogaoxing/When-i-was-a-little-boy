@@ -11,11 +11,16 @@ local ourCellsName =
 }
 
 local Cell = class("Cell", function(nodeType)
-    local index = 1
-        index = math.floor(math.random(#ourCellsName))
+    -- local index = 1
+    --     index = math.floor(math.random(#ourCellsName))
     -- if nodeType == Levels.NODE_IS_BLACK then
     --     index = 8
     -- end
+    if nodeType then
+        index = nodeType
+    else
+        index = math.floor(math.random(#ourCellsName))
+    end
     local sprite = display.newSprite(ourCellsName[index][1])
     sprite.nodeType= index 
     return sprite

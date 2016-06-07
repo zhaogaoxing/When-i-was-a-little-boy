@@ -39,7 +39,7 @@ function Board:ctor(levelData)
 
                 local node = self.grid[row][col]
                 if node ~= Levels.NODE_IS_EMPTY then
-                    local cell = Cell.new(node)
+                    local cell = Cell.new()
                     cell:setScale(GAME_CELL_STAND_SCALE)
                     cell:setPosition(x, y)
                     cell.row = row
@@ -67,7 +67,7 @@ function Board:ctor(levelData)
 
                 local node = self.grid[row][col]
                 if node ~= Levels.NODE_IS_EMPTY then
-                    local cell = Cell.new(node)
+                    local cell = Cell.new()
                     cell:setScale(GAME_CELL_STAND_SCALE)
                     cell:setPosition(x, y)
                     cell.row = row
@@ -88,8 +88,123 @@ function Board:ctor(levelData)
     self:addNodeEventListener(cc.NODE_TOUCH_EVENT, function(event)
         return self:onTouch(event.name, event.x, event.y)
     end)
-
+    self:Check()
 end
+
+-- function Board:FindCells()
+--     local Find = {}
+--     Find[#Find+1] = cell
+--     local i = cell.col
+--     while i > 1 do
+--         i = i - 1
+--         local left_cell = self:getCell(cell.row,i)
+--         if cell.nodeType == left_cell.nodeType then
+--             Find[#Find+1] = left_cell
+--         else
+--             break
+--         end
+--     end
+--     while i > 1 do
+--         i = i + 1
+--         local right_cell = self:getCell(cell.row,i)
+--         if cell.nodeType == right_cell.nodeType then
+--             Find[#Find+1] = right_cell
+--         else
+--             break
+--         end
+--     end
+--     local j = cell.row
+--     while j > 1 do
+--         j = j - 1
+--         local up_cell = self:getCell(j,cell.col)
+--         if cell.nodeType == up_cell.nodeType then
+--             Find[#Find+1] = up_cell
+--         else
+--             break
+--         end
+--     end
+--     while j > 1 do
+--         j = j + 1
+--         local down_cell = self:getCell(j,cell.col)
+--         if cell.nodeType == down_cell.nodeType then
+--             Find[#Find+1] = down_cell
+--         else
+--             break
+--         end
+--     end
+-- end
+
+function Board:checkAll()
+    for i=1,self.rows do
+        for j=1,self.cols-2 do
+            local cell = self.grid[i][j]
+            -- print("he",cell.row,cell.col)
+            local cell_one = self.grid[i][j+1]
+            local cell_two = self.grid[i][j+2]
+            if cell.nodeType == cell_one.nodeType and
+                cell.nodeType == cell_two.nodeType then
+                print("he",i,j)
+                j=j+2
+            end
+        end 
+    end
+    for i=1,self.cols do
+        for j=1,self.rows-2 do
+            local cell = self.grid[j][i]
+            -- print("he",cell.row,cell.col)
+            local cell_three = self.grid[j+1][i]
+            local cell_four = self.grid[j+2][i]
+            if cell.nodeType == cell_three.nodeType and
+                cell.nodeType == cell_four.nodeType then
+                print("he",j,i)
+                j = j+2
+            end
+        end 
+    end
+end
+
+function Board:Check()
+    local i = 1
+    local j = 1
+    while i<= self.rows do
+        j = 1
+        while j<= self.cols do
+            local cell = self.grid[i][j]
+            local sum = 1
+            while j<self.cols and cell.nodeType == self.grid[i][j+1].nodeType do
+                cell = self.grid[i][j+1]
+                j = j + 1
+                sum = sum + 1
+            end
+            if sum >= 3 then
+                print(i,j)
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+
+    i = 1
+    j = 1
+    while i<= self.cols do
+        j = 1
+        while j<= self.rows do
+            local cell = self.grid[j][i]
+            local sum = 1
+            while j<self.cols and cell.nodeType == self.grid[j+1][i].nodeType do
+                cell = self.grid[j+1][i]
+                j = j + 1
+                sum = sum + 1
+            end
+            if sum >= 3 then
+                print(j,i)
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+end
+
 
 function Board:checkLevelCompleted()
     local count = 0
@@ -103,7 +218,7 @@ function Board:checkLevelCompleted()
     end
 end
 
-function Board:getCoin(row, col)
+function Board:getCell(row, col)
     if self.grid[row] then
         return self.grid[row][col]
     end
