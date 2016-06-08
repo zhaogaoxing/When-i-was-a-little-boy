@@ -8,14 +8,14 @@ local PlayLevelScene = class("PlayLevelScene", function()
 end)
 
 function PlayLevelScene:ctor(levelIndex)
-    local bg = display.newSprite("#PlayLevelSceneBg.png")
+    local bg = display.newSprite("beijing6.jpg")
     -- make background sprite always align top
     bg:setPosition(display.cx, display.top - bg:getContentSize().height / 2)
     self:addChild(bg)
 
-    local title = display.newSprite("#Title.png", display.left + 150, display.top - 50)
-    title:setScale(0.5)
-    self:addChild(title)
+    -- local title = display.newSprite("#Title.png", display.left + 150, display.top - 50)
+    -- title:setScale(0.5)
+    -- self:addChild(title)
 
     local label = cc.ui.UILabel.new({
         UILabelType = 1,

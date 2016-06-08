@@ -7,13 +7,13 @@ local ChooseLevelScene = class("ChooseLevelScene", function()
 end)
 
 function ChooseLevelScene:ctor()
-    local bg = display.newSprite("#OtherSceneBg.png")
+    local bg = display.newSprite("meimeibeijing.jpg")
     -- make background sprite always align top
     bg:setPosition(display.cx, display.top - bg:getContentSize().height / 2)
     self:addChild(bg)
 
-    local title = display.newSprite("#Title.png", display.cx, display.top - 100)
-    self:addChild(title)
+    -- local title = display.newSprite("#Title.png", display.cx, display.top - 100)
+    -- self:addChild(title)
 
     -- create levels list
     local rect = cc.rect(display.left, display.bottom + 180, display.width, display.height - 280)

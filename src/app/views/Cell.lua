@@ -3,11 +3,11 @@ local Levels = import("..data.MyLevels")
 
 local ourCellsName =
 {
-    {"#erbing1.png"},
-    {"#fanfan2.png"},
-    {"#malisubing1.png"},
-    {"#shengjingbing1.png"},
-    {"#sinianbing1.png"},
+    {"#lian1_1.jpg"},
+    {"#lian2_1.jpg"},
+    {"#lian3_2.jpg"},
+    {"#lian4_1.jpg"},
+    {"#lian5_1.jpg"},
 }
 
 local Cell = class("Cell", function(nodeType)

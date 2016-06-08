@@ -2,6 +2,11 @@
 local Levels = import("..data.MyLevels")
 local Cell   = import("..views.Cell")
 
+local curSwapBeginRow = -1
+local curSwapBeginCol = -1
+
+local scheduler = cc.Director:getInstance():getScheduler()
+
 local Board = class("Board", function()
     return display.newNode()
 end)
@@ -18,6 +23,18 @@ function Board:ctor(levelData)
     self.batch = display.newNode()
     self.batch:setPosition(display.cx, display.cy)
     self:addChild(self.batch)
+    self.grid = {}
+
+    --多加上一个屏幕的缓冲格子
+    for i=1,levelData.rows * 2 do
+        self.grid[i] = {}
+        if levelData.grid[i] == nil then
+            levelData.grid[i] = {}
+        end
+        for j=1,levelData.cols do
+            self.grid[i][j] = levelData.grid[i][j]
+        end
+    end
 
     self.grid = clone(levelData.grid)
     self.rows = levelData.rows
@@ -26,13 +43,13 @@ function Board:ctor(levelData)
     self.flipAnimationCount = 0
 
     if self.cols<= 8 then
-        local offsetX = -math.floor(NODE_PADDING * self.cols / 2) - NODE_PADDING / 2
-        local offsetY = -math.floor(NODE_PADDING * self.rows / 2) - NODE_PADDING / 2
+        self.offsetX = -math.floor(NODE_PADDING * self.cols / 2) - NODE_PADDING / 2
+        self.offsetY = -math.floor(NODE_PADDING * self.rows / 2) - NODE_PADDING / 2
         -- create board, place all cells
         for row = 1, self.rows do
-            local y = row * NODE_PADDING + offsetY
+            local y = row * NODE_PADDING + self.offsetY
             for col = 1, self.cols do
-                local x = col * NODE_PADDING + offsetX
+                local x = col * NODE_PADDING + self.offsetX
                 local nodeSprite = display.newSprite("#BoardNode.png", x, y)
                 nodeSprite:setScale(GAME_CELL_STAND_SCALE)
                 self.batch:addChild(nodeSprite, NODE_ZORDER)
@@ -53,14 +70,14 @@ function Board:ctor(levelData)
     else
         GAME_CELL_EIGHT_ADD_SCALE = 8.0 / self.cols
         NODE_PADDING = NODE_PADDING * GAME_CELL_EIGHT_ADD_SCALE
-        local offsetX = -math.floor(NODE_PADDING * self.cols / 2) - NODE_PADDING / 2
-        local offsetY = -math.floor(NODE_PADDING * self.rows / 2) - NODE_PADDING / 2
+        self.offsetX = -math.floor(NODE_PADDING * self.cols / 2) - NODE_PADDING / 2
+        self.offsetY = -math.floor(NODE_PADDING * self.rows / 2) - NODE_PADDING / 2
         GAME_CELL_STAND_SCALE = GAME_CELL_EIGHT_ADD_SCALE * GAME_CELL_STAND_SCALE
         -- create board, place all cells
         for row = 1, self.rows do
-            local y = row * NODE_PADDING + offsetY
+            local y = row * NODE_PADDING + self.offsetY
             for col = 1, self.cols do
-                local x = col * NODE_PADDING + offsetX
+                local x = col * NODE_PADDING + self.offsetX
                 local nodeSprite = display.newSprite("#BoardNode.png", x, y)
                 nodeSprite:setScale(GAME_CELL_STAND_SCALE)
                 self.batch:addChild(nodeSprite, NODE_ZORDER)
@@ -78,9 +95,6 @@ function Board:ctor(levelData)
                 end
             end
         end
-        GAME_CELL_EIGHT_ADD_SCALE = 1.0
-        GAME_CELL_STAND_SCALE = GAME_CELL_EIGHT_ADD_SCALE * 0.75
-        NODE_PADDING = 100 * 0.75
     end
 
     self:setNodeEventEnabled(true)
@@ -88,8 +102,258 @@ function Board:ctor(levelData)
     self:addNodeEventListener(cc.NODE_TOUCH_EVENT, function(event)
         return self:onTouch(event.name, event.x, event.y)
     end)
-    self:checkXie2()
+    while self:checkAll() do
+        self:changeSingedCell()
+    end
 end
+
+function Board:getCell(row, col)
+    if self.grid[row] then
+        return self.grid[row][col]
+    end
+end
+
+function Board:checkAll()
+    local padding = NODE_PADDING * GAME_CELL_EIGHT_ADD_SCALE * 1.65
+    for _, cell in ipairs(self.cells) do
+        self:checkCell(cell)
+    end
+    for i,v in pairs (self.cells) do
+        if v.isNeedClean  then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Board:checkCell(cell)
+    local listH = {}
+    listH [#listH + 1] = cell
+    local i=cell.col
+    --格子中左边对象是否相同的遍历
+    while i > 1 do
+        i = i -1
+        local cell_left = self:getCell(cell.row,i)
+        if cell.nodeType == cell_left.nodeType then
+            listH [#listH + 1] = cell_left
+        else
+            break
+        end
+    end
+    --格子中右边对象是否相同的遍历
+    if cell.col ~= self.cols then
+        for j=cell.col+1 , self.cols do
+            local cell_right = self:getCell(cell.row,j)
+            if cell.nodeType == cell_right.nodeType then
+                listH [#listH + 1] = cell_right
+            else
+                break
+            end
+        end
+    end
+    --目前的当前格子的左右待消除对象(连同自己)
+
+    --print(#listH)
+
+    if #listH < 3 then
+    else
+        -- print("find a 3 coup H cell")
+        for i,v in pairs(listH) do
+            v.isNeedClean = true
+        end
+
+    end
+    for i=2,#listH do
+        listH[i] = nil
+    end
+
+    --判断格子的上边的待消除对象
+
+    if cell.row ~= self.rows then
+        for j=cell.row+1 , self.rows do
+            local cell_up = self:getCell(j,cell.col)
+            if cell.nodeType == cell_up.nodeType then
+                listH [#listH + 1] = cell_up
+            else
+                break
+            end
+        end
+    end
+
+    local i=cell.row
+
+    --格子中下面对象是否相同的遍历
+    while i > 1 do
+        i = i -1
+        local cell_down = self:getCell(i,cell.col)
+        if cell.nodeType == cell_down.nodeType then
+            listH [#listH + 1] = cell_down
+        else
+            break
+        end
+    end
+
+    if #listH < 3 then
+        for i=2,#listH do
+            listH[i] = nil
+        end
+    else
+        for i,v in pairs(listH) do
+            v.isNeedClean = true
+        end
+    end
+end
+
+
+function Board:changeSingedCell(onAnimationComplete)
+    local sum = 0
+    --统计所有的掉落项
+
+    local DropList = {}
+
+    --统计所有的最高掉落项
+    local DropListFinal = {}
+
+    for i,v in pairs(self.cells) do
+        if v.isNeedClean then
+            sum = sum +1
+            local drop_pad = 1
+            local row = v.row
+            local col = v.col
+            local x = col * NODE_PADDING + self.offsetX
+            local y = (self.rows + 1)* NODE_PADDING + self.offsetY
+            for i,v in pairs(DropList) do
+                if col == v.col then
+                    drop_pad = drop_pad + 1
+                    y = y + NODE_PADDING
+                    for i2,v2 in pairs(DropListFinal) do
+                        if v2.col == v.col then
+                            table.remove(DropListFinal,i2)
+                        end
+                    end
+                end
+            end
+
+            local cell = Cell.new()
+            DropList [#DropList + 1] = cell
+            DropListFinal [#DropListFinal + 1] = cell
+            cell.isNeedClean = false
+            cell:setPosition(x, y)
+            cell:setScale(GAME_CELL_STAND_SCALE)
+            cell.row = self.rows + drop_pad
+            cell.col = col
+            self.grid[self.rows +  drop_pad][col] = cell
+            if onAnimationComplete == nil then
+                self.batch:removeChild(v, true)
+                self.grid[row][col] = nil
+            else
+                --
+            end
+            self.cells[i] = cell
+            self.batch:addChild(cell, COIN_ZORDER)
+        end
+    end
+
+    local temp = nil
+
+    --进行一次DropListFinal的精简
+    for i=1,#DropListFinal do
+        if DropListFinal[i] then
+            for j=1,#DropList do
+                if DropListFinal[i].col == DropList[j].col and DropListFinal[i].row < DropList[j].row then
+                    DropListFinal[i] = DropList[j]
+                end
+            end
+        end
+    end
+
+    --重新排列grid
+    for i , v in pairs(DropListFinal) do
+        if v then
+            local c = v.row 
+            local j = 1
+            while j <=  self.rows  do
+                if self.grid[j][v.col] == nil then
+                    local k = j
+                    while k <  c + 1 do
+                        self:swap(k,v.col,k+1,v.col)
+                        k = k + 1
+                    end
+                    j = j - 1
+                end
+                j = j + 1
+            end
+        end
+    end
+
+    --填补self.grid空缺
+    --或执行最后的所有动画步骤
+
+    if onAnimationComplete == nil then
+        for i=1,self.rows do
+            for j=1,self.cols do
+                local y = i * NODE_PADDING + self.offsetY
+                local x = j * NODE_PADDING + self.offsetX
+                if self.grid[i][j] then
+                    self.grid[i][j]:setPosition(x,y)
+                end
+            end
+        end
+    else
+        --
+    end
+end
+
+function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
+    local temp
+    if self.grid[row1][col1] then
+        self.grid[row1][col1].row = row2
+        self.grid[row1][col1].col = col2
+    end
+    if self.grid[row2][col2] then
+        self.grid[row2][col2].row = row1
+        self.grid[row2][col2].col = col2
+    end
+    
+    temp = self.grid[row1][col1] 
+    self.grid[row1][col1] = self.grid[row2][col2]
+    self.grid[row2][col2] = temp
+
+    if isAnimation ~= nil then
+        if isAnimation  then
+            local X1,Y1 = self.grid[row1][col1]:getPosition()
+            local X2,Y2 = self.grid[row2][col2]:getPosition()
+            if callBack then
+                self.grid[row1][col1]:runAction(transition.sequence({
+                        cc.MoveTo:create(0.8, cc.p(X2,Y2)),
+                        cc.CallFunc:create(function()
+                             callBack()   
+                        end)
+                    }))
+                self.grid[row2][col2]:runAction(cc.MoveTo:create(0.8, cc.p(X1,Y1)))
+            else
+                self.grid[row1][col1]:runAction(cc.MoveTo:create(0.8, cc.p(X2,Y2)))
+                self.grid[row2][col2]:runAction(cc.MoveTo:create(0.8, cc.p(X1,Y1)))
+            end
+            
+        else
+            local tempX,tempY = self.grid[row1][col1]:getPosition()
+            self.grid[row1][col1]:setPosition(self.grid[row2][col2]:getPositionX(),self.grid[row2][col2]:getPositionY())
+            self.grid[row2][col2]:setPosition(tempX,tempY)
+        end
+    end
+end
+-- function Board:changeSingedCell()
+--     local sum = 0
+--     for i,v in pairs(self.cells) do
+--         if v.isNeedClean then
+--             sum = sum +1
+--             print("x",v.row,"y",v.col,"type",v.nodeType)
+--             print("find it!!!!!!",sum )
+--         end
+--     end
+-- end
 
 -- function Board:FindCells()
 --     local Find = {}
@@ -134,128 +398,206 @@ end
 --     end
 -- end
 
-function Board:checkAll()
-    for i=1,self.rows do
-        for j=1,self.cols-2 do
-            local cell = self.grid[i][j]
-            -- print("he",cell.row,cell.col)
-            local cell_one = self.grid[i][j+1]
-            local cell_two = self.grid[i][j+2]
-            if cell.nodeType == cell_one.nodeType and
-                cell.nodeType == cell_two.nodeType then
-                print("he",i,j)
-                j=j+2
-            end
-        end 
-    end
-    for i=1,self.cols do
-        for j=1,self.rows-2 do
-            local cell = self.grid[j][i]
-            -- print("he",cell.row,cell.col)
-            local cell_three = self.grid[j+1][i]
-            local cell_four = self.grid[j+2][i]
-            if cell.nodeType == cell_three.nodeType and
-                cell.nodeType == cell_four.nodeType then
-                print("he",j,i)
-                j = j+2
-            end
-        end 
-    end
-end
+-- function Board:checkAll()
+--     for i=1,self.rows do
+--         for j=1,self.cols-2 do
+--             local cell = self.grid[i][j]
+--             -- print("he",cell.row,cell.col)
+--             local cell_one = self.grid[i][j+1]
+--             local cell_two = self.grid[i][j+2]
+--             if cell.nodeType == cell_one.nodeType and
+--                 cell.nodeType == cell_two.nodeType then
+--                 print("he",i,j)
+--                 j=j+2
+--             end
+--         end 
+--     end
+--     for i=1,self.cols do
+--         for j=1,self.rows-2 do
+--             local cell = self.grid[j][i]
+--             -- print("he",cell.row,cell.col)
+--             local cell_three = self.grid[j+1][i]
+--             local cell_four = self.grid[j+2][i]
+--             if cell.nodeType == cell_three.nodeType and
+--                 cell.nodeType == cell_four.nodeType then
+--                 print("he",j,i)
+--                 j = j+2
+--             end
+--         end 
+--     end
+-- end
 
-function Board:Check()
-    local i = 1
-    local j = 1
-    while i<= self.rows do
-        j = 1
-        while j<= self.cols do
-            local cell = self.grid[i][j]
-            local sum = 1
-            while j<self.cols and cell.nodeType == self.grid[i][j+1].nodeType do
-                cell = self.grid[i][j+1]
-                j = j + 1
-                sum = sum + 1
-            end
-            if sum >= 3 then
-                print(i,j)
-            end
-            j = j + 1
-        end
-        i = i + 1
-    end
+-- function Board:Check()
+--     local i = 1
+--     local j = 1
+--     local list1 = {}
+--     list1[#list1 + 1] = cell
+--     while i<= self.rows do
+--         j = 1
+--         while j<= self.cols do
+--             local cell = self.grid[i][j]
+--             local cell_self = self.grid[i][j]
+--             local sum = 1
+--             while j<self.cols and cell.nodeType == self.grid[i][j+1].nodeType do
+--                 cell = self.grid[i][j+1]
+--                 list1[#list1 + 1] = cell
+--                 j = j + 1
+--                 sum = sum + 1
+--             end
+--             if sum >= 3 then
+--                 list1[#list1 + 1] = cell_self
+--                 -- print(i,j)
+--                 for _,v in pairs(list1) do
+--                     print("he",v.row,"  ",v.col)
+--                 end
+--                 else
+--                     list1 = {}
+--             end
+--             j = j + 1
+--         end
+--         i = i + 1
+--     end
 
-    i = 1
-    j = 1
-    while i<= self.cols do
-        j = 1
-        while j<= self.rows do
-            local cell = self.grid[j][i]
-            local sum = 1
-            while j<self.cols and cell.nodeType == self.grid[j+1][i].nodeType do
-                cell = self.grid[j+1][i]
-                j = j + 1
-                sum = sum + 1
-            end
-            if sum >= 3 then
-                print(j,i)
-            end
-            j = j + 1
-        end
-        i = i + 1
-    end
-end
+--     i = 1
+--     j = 1
+--     while i<= self.cols do
+--         j = 1
+--         while j<= self.rows do
+--             local cell = self.grid[j][i]
+--             local sum = 1
+--             while j<self.cols and cell.nodeType == self.grid[j+1][i].nodeType do
+--                 cell = self.grid[j+1][i]
+--                 j = j + 1
+--                 sum = sum + 1
+--             end
+--            if sum >= 3 then
+--                 list1[#list1 + 1] = cell_self
+--                 -- print(i,j)
+--                 for _,v in pairs(list1) do
+--                     print("he",v.row,"  ",v.col)
+--                 end
+--                 else
+--                     list1 = {}
+--             end
+--             j = j + 1
+--         end
+--         i = i + 1
+--     end
+-- end
 
-function Board:checkXie2()
-    local i = 1
-    local j = 1
-    while i<= self.rows do
-        j = 1
-        while j<= self.cols do
-            local cell = self.grid[i][j]
-            local sum = 1
-            while j<self.cols and i<self.rows and cell.nodeType == self.grid[i+1][j+1].nodeType do
-                cell = self.grid[i+1][j+1]
-                j = j + 1
-                i = i + 1    
-                sum = sum + 1
-            end
-            if sum >= 3 then
-                print(i,j)
-            end
-            j = j + 1
-        end
-        i = i + 1
-    end
-end
+-- function Board:checkXie2()
+--     local i = 1
+--     local j = 1
+--     while i<= self.rows do
+--         j = 1
+--         while j<= self.cols do
+--             local cell = self.grid[i][j]
+--             local sum = 1
+--             while j<self.cols and i<self.rows and cell.nodeType == self.grid[i+1][j+1].nodeType do
+--                 cell = self.grid[i+1][j+1]
+--                 j = j + 1
+--                 i = i + 1    
+--                 sum = sum + 1
+--             end
+--             if sum >= 3 then
+--                 print(i,j)
+--             end
+--             j = j + 1
+--         end
+--         i = i + 1
+--     end
 
-function Board:checkXie()
-    for i=1,self.rows-2 do
-        for j=1,self.cols-2 do
-            local cell = self.grid[i][j]
-            -- print("he",cell.row,cell.col)
-            local cell_one = self.grid[i+1][j+1]
-            local cell_two = self.grid[i+2][j+2]
-            if cell.nodeType == cell_one.nodeType and
-                cell.nodeType == cell_two.nodeType then
-                print("he",i,j)
-            end
-        end 
-    end
-    local i = self.rows
-    while i >= 4  do
-        i = i - 1
-        for j=1,self.cols-2 do
-            local cell = self.grid[i][j]
-            -- print("he",cell.row,cell.col)
-            local cell_one = self.grid[i-1][j+1]
-            local cell_two = self.grid[i-2][j+2]
-            if cell.nodeType == cell_one.nodeType and
-                cell.nodeType == cell_two.nodeType then
-                print("he",i,j)
-            end
-        end 
-    end
-end
+--     i = self.rows
+--     j = self.cols
+--     while i>=1 do
+--         j = self.cols
+--         while j>=1 do
+--             local cell = self.grid[i][j]
+--             local sum = 1
+--             while j>1 and i>1 and cell.nodeType == self.grid[i-1][j-1].nodeType do
+--                 cell = self.grid[i-1][j-1]
+--                 j = j - 1
+--                 i = i - 1    
+--                 sum = sum + 1
+--             end
+--             if sum >= 3 then
+--                 print(i,j)
+--             end
+--             j = j - 1
+--         end
+--         i = i - 1
+--     end
+
+--     i = self.rows
+--     j = 1
+--     while i>=1 do
+--         j = 1
+--         while j<= self.cols do
+--             local cell = self.grid[i][j]
+--             local sum = 1
+--             while j<self.cols and i>1 and cell.nodeType == self.grid[i-1][j+1].nodeType do
+--                 cell = self.grid[i-1][j+1]
+--                 j = j + 1
+--                 i = i - 1    
+--                 sum = sum + 1
+--             end
+--             if sum >= 3 then
+--                 print(i,j)
+--             end
+--             j = j + 1
+--         end
+--         i = i - 1
+--     end
+--     i = 1
+--     j = self.cols
+--     while i<=self.rows do
+--         j = self.cols
+--         while j>= 1 do
+--             local cell = self.grid[i][j]
+--             local sum = 1
+--             while j>1 and i<self.rows and cell.nodeType == self.grid[i+1][j-1].nodeType do
+--                 cell = self.grid[i+1][j-1]
+--                 j = j - 1
+--                 i = i + 1    
+--                 sum = sum + 1
+--             end
+--             if sum >= 3 then
+--                 print(i,j)
+--             end
+--             j = j - 1
+--         end
+--         i = i + 1
+--     end
+-- end
+
+-- function Board:checkXie()
+--     for i=1,self.rows-2 do
+--         for j=1,self.cols-2 do
+--             local cell = self.grid[i][j]
+--             -- print("he",cell.row,cell.col)
+--             local cell_one = self.grid[i+1][j+1]
+--             local cell_two = self.grid[i+2][j+2]
+--             if cell.nodeType == cell_one.nodeType and
+--                 cell.nodeType == cell_two.nodeType then
+--                 print("he",i,j)
+--             end
+--         end 
+--     end
+--     local i = self.rows
+--     while i >= 4  do
+--         i = i - 1
+--         for j=1,self.cols-2 do
+--             local cell = self.grid[i][j]
+--             -- print("he",cell.row,cell.col)
+--             local cell_one = self.grid[i-1][j+1]
+--             local cell_two = self.grid[i-2][j+2]
+--             if cell.nodeType == cell_one.nodeType and
+--                 cell.nodeType == cell_two.nodeType then
+--                 print("he",i,j)
+--             end
+--         end 
+--     end
+-- end
 
 function Board:checkLevelCompleted()
     local count = 0
@@ -299,21 +641,41 @@ function Board:flipCoin(cell, includeNeighbour)
 end
 
 function Board:onTouch(event, x, y)
-    if event ~= "began" or self.flipAnimationCount > 0 then return end
+    if event == "began" then
+        local row,col = self:getRandC(x, y)
+        curSwapBeginRow = row
+        curSwapBeginCol = col
+        print(row,col)
+    end
 
-    -- local padding = NODE_PADDING / 2
-    -- for _, coin in ipairs(self.coins) do
-    --     local cx, cy = coin:getPosition()
-    --     cx = cx + display.cx
-    --     cy = cy + display.cy
-    --     if x >= cx - padding
-    --         and x <= cx + padding
-    --         and y >= cy - padding
-    --         and y <= cy + padding then
-    --         self:flipCoin(coin, true)
-    --         break
-    --     end
-    -- end
+    if event == "ended" then
+        local row,col = self:getRandC(x, y)
+        print(row,col)
+
+        self:swap(curSwapBeginRow, curSwapBeginCol, row, col, true , function()
+            if self:checkAll() then
+                self:changeSingedCell(true)
+            end
+        end) 
+    end
+    
+    return true
+end
+
+function Board:getRandC(x,y)
+    local padding = NODE_PADDING / 2
+    for _, cell in ipairs(self.cells) do
+        local cx, cy = cell:getPosition()
+        cx = cx + display.cx
+        cy = cy + display.cy
+        if x >= cx - padding
+            and x <= cx + padding
+            and y >= cy - padding
+            and y <= cy + padding then
+            return cell.row , cell.col
+        end
+    end
+    return -1 , -1
 end
 
 function Board:onEnter()
@@ -321,6 +683,9 @@ function Board:onEnter()
 end
 
 function Board:onExit()
+    GAME_CELL_EIGHT_ADD_SCALE = 1.0
+    GAME_CELL_STAND_SCALE = GAME_CELL_EIGHT_ADD_SCALE * 0.75
+    NODE_PADDING = 100 * 0.75
     self:removeAllEventListeners()
 end
 
