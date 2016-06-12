@@ -16,6 +16,14 @@ local NODE_ZORDER    = 0
 
 local COIN_ZORDER    = 1000
 
+
+local isInAnimation = false
+local isInTouch = false
+local isEnableTouch = true
+local swapDruTime = 0.8
+local cell_anim_time = 0.68
+local drop_time = 0.9
+
 function Board:ctor(levelData)
     cc.GameObject.extend(self):addComponent("components.behavior.EventProtocol"):exportMethods()
     math.randomseed(tostring(os.time()):reverse():sub(1,6))
@@ -307,13 +315,18 @@ end
 
 function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
     local temp
-    if self.grid[row1][col1] then
+    if self.grid[row1] and self.grid[row1][col1] then
         self.grid[row1][col1].row = row2
         self.grid[row1][col1].col = col2
     end
-    if self.grid[row2][col2] then
+    if self.grid[row2] and self.grid[row2][col2] then
         self.grid[row2][col2].row = row1
-        self.grid[row2][col2].col = col2
+        self.grid[row2][col2].col = col1
+    end
+    if self.grid[row2] == nil or self.grid[row1] == nil then
+        isEnableTouch = true
+        print("error")
+        return
     end
     
     temp = self.grid[row1][col1] 
@@ -321,13 +334,20 @@ function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
     self.grid[row2][col2] = temp
 
     if isAnimation ~= nil then
+        isEnableTouch = true
         if isAnimation  then
-            local X1,Y1 = self.grid[row1][col1]:getPosition()
-            local X2,Y2 = self.grid[row2][col2]:getPosition()
+            local X2,Y2 = col1 * NODE_PADDING + self.offsetX , row1  * NODE_PADDING + self.offsetY
+            local X1,Y1 = col2 * NODE_PADDING + self.offsetX , row2  * NODE_PADDING + self.offsetY
+            if (row1==row2+1 and col1==col2) or
+                (row1==row2-1 and col1==col2) or
+                (row1==row2 and col1==col2+1) or
+                (row1==row2 and col1==col2-1) 
+                then
             if callBack then
                 self.grid[row1][col1]:runAction(transition.sequence({
                         cc.MoveTo:create(0.8, cc.p(X2,Y2)),
                         cc.CallFunc:create(function()
+                            self:swap(row1,col1,row2,col2)
                              callBack()   
                         end)
                     }))
@@ -335,13 +355,16 @@ function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
             else
                 self.grid[row1][col1]:runAction(cc.MoveTo:create(0.8, cc.p(X2,Y2)))
                 self.grid[row2][col2]:runAction(cc.MoveTo:create(0.8, cc.p(X1,Y1)))
+                self:swap(row1,col1,row2,col2)
             end
             
-        else
-            local tempX,tempY = self.grid[row1][col1]:getPosition()
-            self.grid[row1][col1]:setPosition(self.grid[row2][col2]:getPositionX(),self.grid[row2][col2]:getPositionY())
-            self.grid[row2][col2]:setPosition(tempX,tempY)
+        -- else
+        --     local tempX,tempY = self.grid[row1][col1]:getPosition()
+        --     self.grid[row1][col1]:setPosition(self.grid[row2][col2]:getPositionX(),self.grid[row2][col2]:getPositionY())
+        --     self.grid[row2][col2]:setPosition(tempX,tempY)
         end
+    end
+    self:swap(row1,col1,row2,col2)
     end
 end
 -- function Board:changeSingedCell()
@@ -641,24 +664,90 @@ function Board:flipCoin(cell, includeNeighbour)
 end
 
 function Board:onTouch(event, x, y)
+    if not isEnableTouch then
+        return
+    end
     if event == "began" then
         local row,col = self:getRandC(x, y)
         curSwapBeginRow = row
         curSwapBeginCol = col
-        print(row,col)
+        isInTouch = true
     end
+    if isInTouch and (event == "moved" or event == "ended"  )then
+        local padding = NODE_PADDING / 2
+        local cell_center = self.grid[curSwapBeginRow][curSwapBeginCol]
+        local cx, cy = cell_center:getPosition()
+        cx = cx + display.cx
+        cy = cy + display.cy
 
-    if event == "ended" then
-        local row,col = self:getRandC(x, y)
-        print(row,col)
+        if event == "ended" then
+            isInTouch = false
+            local p_a = cell_center:getAnchorPoint()
+            local x_a = (0.5 - p_a.x ) *  NODE_PADDING + curSwapBeginCol * NODE_PADDING + self.offsetX
+            local y_a = (0.5 - p_a.y) *  NODE_PADDING + curSwapBeginRow * NODE_PADDING + self.offsetY
+            cell_center:setAnchorPoint(cc.p(0.5,0.5))
+            cell_center:setPosition(cc.p(x_a  , y_a ))
+            isEnableTouch = false
+                cell_center:runAction(
+                    transition.sequence({
+                    cc.MoveTo:create(0.4,cc.p(curSwapBeginCol * NODE_PADDING + self.offsetX,curSwapBeginRow * NODE_PADDING + self.offsetY)),
+                    cc.CallFunc:create(function()
+                          isEnableTouch = true
+                    end)
+                }))
+            cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
+            return true
+        end
 
-        self:swap(curSwapBeginRow, curSwapBeginCol, row, col, true , function()
-            if self:checkAll() then
-                self:changeSingedCell(true)
+        if x < cx - 2*padding
+            or x > cx + 2*padding
+            or y < cy - 2*padding
+            or y > cy + 2*padding then
+            isInTouch = false
+
+            --划归锚点偏移
+            local p_a = cell_center:getAnchorPoint()
+            local x_a = (0.5 - p_a.x ) *  NODE_PADDING + curSwapBeginCol * NODE_PADDING + self.offsetX
+            local y_a = (0.5 - p_a.y) *  NODE_PADDING + curSwapBeginRow * NODE_PADDING + self.offsetY
+            cell_center:setAnchorPoint(cc.p(0.5,0.5))
+            cell_center:setPosition(cc.p(x_a  , y_a ))
+
+            --进入十字框以内
+            if (x >= cx - padding
+            and x <= cx + padding)
+            or (y >= cy - padding
+            and y <= cy + padding) then
+
+                local row,col = self:getRandC(x, y)
+
+                isEnableTouch = false
+                self:swap(row,col,curSwapBeginRow,curSwapBeginCol,
+                    function()
+                        isEnableTouch = true
+                        if self:checkAll() then
+                        self:changeSingedCell(true)
+                        end
+                    end
+                    )
+                cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
+            else
+                isEnableTouch = false
+                cell_center:runAction(
+                    transition.sequence({
+                    cc.MoveTo:create(0.4,cc.p(curSwapBeginCol * NODE_PADDING + self.offsetX,curSwapBeginRow * NODE_PADDING + self.offsetY)),
+                    cc.CallFunc:create(function()
+                          isEnableTouch = true
+                    end)
+                }))
+                cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
+                return true
             end
-        end) 
+        else
+            x_vec = (cx - x)/ NODE_PADDING * 0.3 + 0.5
+            y_vec = (cy - y)/ NODE_PADDING * 0.3 + 0.5
+            cell_center:setAnchorPoint(cc.p(x_vec,y_vec))
+        end
     end
-    
     return true
 end
 
