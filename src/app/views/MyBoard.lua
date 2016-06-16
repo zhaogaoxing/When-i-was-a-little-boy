@@ -15,7 +15,8 @@ local NODE_PADDING   = 100 * GAME_CELL_STAND_SCALE
 local NODE_ZORDER    = 0
 
 local COIN_ZORDER    = 1000
-
+local CELL_ZORDER    = 1000
+local SWAP_TIME = 0.6
 
 local isInAnimation = false
 local isInTouch = false
@@ -23,6 +24,7 @@ local isEnableTouch = true
 local swapDruTime = 0.8
 local cell_anim_time = 0.68
 local drop_time = 0.9
+local CELL_SCALE = 0.75
 
 function Board:ctor(levelData)
     cc.GameObject.extend(self):addComponent("components.behavior.EventProtocol"):exportMethods()
@@ -65,7 +67,7 @@ function Board:ctor(levelData)
                 local node = self.grid[row][col]
                 if node ~= Levels.NODE_IS_EMPTY then
                     local cell = Cell.new()
-                    cell:setScale(GAME_CELL_STAND_SCALE)
+                    cell:setScale(GAME_CELL_STAND_SCALE*0.9)
                     cell:setPosition(x, y)
                     cell.row = row
                     cell.col = col
@@ -80,20 +82,20 @@ function Board:ctor(levelData)
         NODE_PADDING = NODE_PADDING * GAME_CELL_EIGHT_ADD_SCALE
         self.offsetX = -math.floor(NODE_PADDING * self.cols / 2) - NODE_PADDING / 2
         self.offsetY = -math.floor(NODE_PADDING * self.rows / 2) - NODE_PADDING / 2
-        GAME_CELL_STAND_SCALE = GAME_CELL_EIGHT_ADD_SCALE * GAME_CELL_STAND_SCALE
+        GAME_CELL_STAND_SCALE = GAME_CELL_EIGHT_ADD_SCALE * GAME_CELL_STAND_SCALE*0.9
         -- create board, place all cells
         for row = 1, self.rows do
             local y = row * NODE_PADDING + self.offsetY
             for col = 1, self.cols do
                 local x = col * NODE_PADDING + self.offsetX
                 local nodeSprite = display.newSprite("#BoardNode.png", x, y)
-                nodeSprite:setScale(GAME_CELL_STAND_SCALE)
+                nodeSprite:setScale(GAME_CELL_STAND_SCALE*1.1)
                 self.batch:addChild(nodeSprite, NODE_ZORDER)
 
                 local node = self.grid[row][col]
                 if node ~= Levels.NODE_IS_EMPTY then
                     local cell = Cell.new()
-                    cell:setScale(GAME_CELL_STAND_SCALE)
+                    cell:setScale(GAME_CELL_STAND_SCALE*0.9)
                     cell:setPosition(x, y)
                     cell.row = row
                     cell.col = col
@@ -248,7 +250,7 @@ function Board:changeSingedCell(onAnimationComplete)
             DropListFinal [#DropListFinal + 1] = cell
             cell.isNeedClean = false
             cell:setPosition(x, y)
-            cell:setScale(GAME_CELL_STAND_SCALE)
+            cell:setScale(GAME_CELL_STAND_SCALE*0.9)
             cell.row = self.rows + drop_pad
             cell.col = col
             self.grid[self.rows +  drop_pad][col] = cell
@@ -313,6 +315,7 @@ function Board:changeSingedCell(onAnimationComplete)
     end
 end
 
+
 function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
     local temp
     if self.grid[row1] and self.grid[row1][col1] then
@@ -323,31 +326,28 @@ function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
         self.grid[row2][col2].row = row1
         self.grid[row2][col2].col = col1
     end
-    if self.grid[row2] == nil or self.grid[row1] == nil then
+    
+    if self.grid[row1] == nil or self.grid[row2] == nil then
         isEnableTouch = true
-        print("error")
+        print("erro",row1,col1,row2,col2)
         return
     end
-    
     temp = self.grid[row1][col1] 
     self.grid[row1][col1] = self.grid[row2][col2]
     self.grid[row2][col2] = temp
 
+    
     if isAnimation ~= nil then
-        isEnableTouch = true
         if isAnimation  then
+            -- local X1,Y1 = self.grid[row1][col1]:getPosition()
+            -- local X2,Y2 = self.grid[row2][col2]:getPosition()
             local X2,Y2 = col1 * NODE_PADDING + self.offsetX , row1  * NODE_PADDING + self.offsetY
             local X1,Y1 = col2 * NODE_PADDING + self.offsetX , row2  * NODE_PADDING + self.offsetY
-            if (row1==row2+1 and col1==col2) or
-                (row1==row2-1 and col1==col2) or
-                (row1==row2 and col1==col2+1) or
-                (row1==row2 and col1==col2-1) 
-                then
             if callBack then
                 self.grid[row1][col1]:runAction(transition.sequence({
                         cc.MoveTo:create(0.8, cc.p(X2,Y2)),
                         cc.CallFunc:create(function()
-                            self:swap(row1,col1,row2,col2)
+                            isEnableTouch = true
                              callBack()   
                         end)
                     }))
@@ -355,272 +355,16 @@ function Board:swap(row1,col1,row2,col2,isAnimation,callBack)
             else
                 self.grid[row1][col1]:runAction(cc.MoveTo:create(0.8, cc.p(X2,Y2)))
                 self.grid[row2][col2]:runAction(cc.MoveTo:create(0.8, cc.p(X1,Y1)))
-                self:swap(row1,col1,row2,col2)
             end
             
-        -- else
-        --     local tempX,tempY = self.grid[row1][col1]:getPosition()
-        --     self.grid[row1][col1]:setPosition(self.grid[row2][col2]:getPositionX(),self.grid[row2][col2]:getPositionY())
-        --     self.grid[row2][col2]:setPosition(tempX,tempY)
+        else
+            local tempX,tempY = self.grid[row1][col1]:getPosition()
+            self.grid[row1][col1]:setPosition(self.grid[row2][col2]:getPositionX(),self.grid[row2][col2]:getPositionY())
+            self.grid[row2][col2]:setPosition(tempX,tempY)
         end
     end
-    self:swap(row1,col1,row2,col2)
-    end
 end
--- function Board:changeSingedCell()
---     local sum = 0
---     for i,v in pairs(self.cells) do
---         if v.isNeedClean then
---             sum = sum +1
---             print("x",v.row,"y",v.col,"type",v.nodeType)
---             print("find it!!!!!!",sum )
---         end
---     end
--- end
 
--- function Board:FindCells()
---     local Find = {}
---     Find[#Find+1] = cell
---     local i = cell.col
---     while i > 1 do
---         i = i - 1
---         local left_cell = self:getCell(cell.row,i)
---         if cell.nodeType == left_cell.nodeType then
---             Find[#Find+1] = left_cell
---         else
---             break
---         end
---     end
---     while i > 1 do
---         i = i + 1
---         local right_cell = self:getCell(cell.row,i)
---         if cell.nodeType == right_cell.nodeType then
---             Find[#Find+1] = right_cell
---         else
---             break
---         end
---     end
---     local j = cell.row
---     while j > 1 do
---         j = j - 1
---         local up_cell = self:getCell(j,cell.col)
---         if cell.nodeType == up_cell.nodeType then
---             Find[#Find+1] = up_cell
---         else
---             break
---         end
---     end
---     while j > 1 do
---         j = j + 1
---         local down_cell = self:getCell(j,cell.col)
---         if cell.nodeType == down_cell.nodeType then
---             Find[#Find+1] = down_cell
---         else
---             break
---         end
---     end
--- end
-
--- function Board:checkAll()
---     for i=1,self.rows do
---         for j=1,self.cols-2 do
---             local cell = self.grid[i][j]
---             -- print("he",cell.row,cell.col)
---             local cell_one = self.grid[i][j+1]
---             local cell_two = self.grid[i][j+2]
---             if cell.nodeType == cell_one.nodeType and
---                 cell.nodeType == cell_two.nodeType then
---                 print("he",i,j)
---                 j=j+2
---             end
---         end 
---     end
---     for i=1,self.cols do
---         for j=1,self.rows-2 do
---             local cell = self.grid[j][i]
---             -- print("he",cell.row,cell.col)
---             local cell_three = self.grid[j+1][i]
---             local cell_four = self.grid[j+2][i]
---             if cell.nodeType == cell_three.nodeType and
---                 cell.nodeType == cell_four.nodeType then
---                 print("he",j,i)
---                 j = j+2
---             end
---         end 
---     end
--- end
-
--- function Board:Check()
---     local i = 1
---     local j = 1
---     local list1 = {}
---     list1[#list1 + 1] = cell
---     while i<= self.rows do
---         j = 1
---         while j<= self.cols do
---             local cell = self.grid[i][j]
---             local cell_self = self.grid[i][j]
---             local sum = 1
---             while j<self.cols and cell.nodeType == self.grid[i][j+1].nodeType do
---                 cell = self.grid[i][j+1]
---                 list1[#list1 + 1] = cell
---                 j = j + 1
---                 sum = sum + 1
---             end
---             if sum >= 3 then
---                 list1[#list1 + 1] = cell_self
---                 -- print(i,j)
---                 for _,v in pairs(list1) do
---                     print("he",v.row,"  ",v.col)
---                 end
---                 else
---                     list1 = {}
---             end
---             j = j + 1
---         end
---         i = i + 1
---     end
-
---     i = 1
---     j = 1
---     while i<= self.cols do
---         j = 1
---         while j<= self.rows do
---             local cell = self.grid[j][i]
---             local sum = 1
---             while j<self.cols and cell.nodeType == self.grid[j+1][i].nodeType do
---                 cell = self.grid[j+1][i]
---                 j = j + 1
---                 sum = sum + 1
---             end
---            if sum >= 3 then
---                 list1[#list1 + 1] = cell_self
---                 -- print(i,j)
---                 for _,v in pairs(list1) do
---                     print("he",v.row,"  ",v.col)
---                 end
---                 else
---                     list1 = {}
---             end
---             j = j + 1
---         end
---         i = i + 1
---     end
--- end
-
--- function Board:checkXie2()
---     local i = 1
---     local j = 1
---     while i<= self.rows do
---         j = 1
---         while j<= self.cols do
---             local cell = self.grid[i][j]
---             local sum = 1
---             while j<self.cols and i<self.rows and cell.nodeType == self.grid[i+1][j+1].nodeType do
---                 cell = self.grid[i+1][j+1]
---                 j = j + 1
---                 i = i + 1    
---                 sum = sum + 1
---             end
---             if sum >= 3 then
---                 print(i,j)
---             end
---             j = j + 1
---         end
---         i = i + 1
---     end
-
---     i = self.rows
---     j = self.cols
---     while i>=1 do
---         j = self.cols
---         while j>=1 do
---             local cell = self.grid[i][j]
---             local sum = 1
---             while j>1 and i>1 and cell.nodeType == self.grid[i-1][j-1].nodeType do
---                 cell = self.grid[i-1][j-1]
---                 j = j - 1
---                 i = i - 1    
---                 sum = sum + 1
---             end
---             if sum >= 3 then
---                 print(i,j)
---             end
---             j = j - 1
---         end
---         i = i - 1
---     end
-
---     i = self.rows
---     j = 1
---     while i>=1 do
---         j = 1
---         while j<= self.cols do
---             local cell = self.grid[i][j]
---             local sum = 1
---             while j<self.cols and i>1 and cell.nodeType == self.grid[i-1][j+1].nodeType do
---                 cell = self.grid[i-1][j+1]
---                 j = j + 1
---                 i = i - 1    
---                 sum = sum + 1
---             end
---             if sum >= 3 then
---                 print(i,j)
---             end
---             j = j + 1
---         end
---         i = i - 1
---     end
---     i = 1
---     j = self.cols
---     while i<=self.rows do
---         j = self.cols
---         while j>= 1 do
---             local cell = self.grid[i][j]
---             local sum = 1
---             while j>1 and i<self.rows and cell.nodeType == self.grid[i+1][j-1].nodeType do
---                 cell = self.grid[i+1][j-1]
---                 j = j - 1
---                 i = i + 1    
---                 sum = sum + 1
---             end
---             if sum >= 3 then
---                 print(i,j)
---             end
---             j = j - 1
---         end
---         i = i + 1
---     end
--- end
-
--- function Board:checkXie()
---     for i=1,self.rows-2 do
---         for j=1,self.cols-2 do
---             local cell = self.grid[i][j]
---             -- print("he",cell.row,cell.col)
---             local cell_one = self.grid[i+1][j+1]
---             local cell_two = self.grid[i+2][j+2]
---             if cell.nodeType == cell_one.nodeType and
---                 cell.nodeType == cell_two.nodeType then
---                 print("he",i,j)
---             end
---         end 
---     end
---     local i = self.rows
---     while i >= 4  do
---         i = i - 1
---         for j=1,self.cols-2 do
---             local cell = self.grid[i][j]
---             -- print("he",cell.row,cell.col)
---             local cell_one = self.grid[i-1][j+1]
---             local cell_two = self.grid[i-2][j+2]
---             if cell.nodeType == cell_one.nodeType and
---                 cell.nodeType == cell_two.nodeType then
---                 print("he",i,j)
---             end
---         end 
---     end
--- end
 
 function Board:checkLevelCompleted()
     local count = 0
@@ -663,40 +407,71 @@ function Board:flipCoin(cell, includeNeighbour)
     end
 end
 
+function Board:checkNotClean()
+    for i,v in pairs (self.cells) do
+        if v.isNeedClean  then
+            isEnableTouch = false
+            return true
+        end
+    end
+    isEnableTouch = true
+    return false
+end
+
+--触摸事件
 function Board:onTouch(event, x, y)
+
     if not isEnableTouch then
         return
     end
+
     if event == "began" then
         local row,col = self:getRandC(x, y)
         curSwapBeginRow = row
         curSwapBeginCol = col
+        if curSwapBeginRow == -1 or curSwapBeginCol == -1 then
+            return false 
+        end
         isInTouch = true
+        self.grid[curSwapBeginRow][curSwapBeginCol]:setLocalZOrder(CELL_ZORDER+1)
+        self.grid[curSwapBeginRow][curSwapBeginCol]:scale(0.6)
+        return true
     end
+
     if isInTouch and (event == "moved" or event == "ended"  )then
+
         local padding = NODE_PADDING / 2
         local cell_center = self.grid[curSwapBeginRow][curSwapBeginCol]
         local cx, cy = cell_center:getPosition()
         cx = cx + display.cx
         cy = cy + display.cy
-
-        if event == "ended" then
+        cell_center:runAction(cc.scaleTo(0.5, GAME_CELL_STAND_SCALE*0.9))
+        --锚点归位
+        local AnchBack = function()
             isInTouch = false
             local p_a = cell_center:getAnchorPoint()
-            local x_a = (0.5 - p_a.x ) *  NODE_PADDING + curSwapBeginCol * NODE_PADDING + self.offsetX
+            local x_a = (0.5 - p_a.x) *  NODE_PADDING + curSwapBeginCol * NODE_PADDING + self.offsetX
             local y_a = (0.5 - p_a.y) *  NODE_PADDING + curSwapBeginRow * NODE_PADDING + self.offsetY
             cell_center:setAnchorPoint(cc.p(0.5,0.5))
             cell_center:setPosition(cc.p(x_a  , y_a ))
+        end
+        --动画回到格子定义点
+        local AnimBack = function()
             isEnableTouch = false
                 cell_center:runAction(
                     transition.sequence({
-                    cc.MoveTo:create(0.4,cc.p(curSwapBeginCol * NODE_PADDING + self.offsetX,curSwapBeginRow * NODE_PADDING + self.offsetY)),
+                    cc.MoveTo:create(SWAP_TIME/2,cc.p(curSwapBeginCol * NODE_PADDING + self.offsetX,curSwapBeginRow * NODE_PADDING + self.offsetY)),
                     cc.CallFunc:create(function()
                           isEnableTouch = true
                     end)
                 }))
-            cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
-            return true
+            self.grid[curSwapBeginRow][curSwapBeginCol]:setLocalZOrder(CELL_ZORDER)
+        end
+        if event == "ended" then
+            AnchBack()
+            AnimBack()
+            
+            return
         end
 
         if x < cx - 2*padding
@@ -704,43 +479,38 @@ function Board:onTouch(event, x, y)
             or y < cy - 2*padding
             or y > cy + 2*padding then
             isInTouch = false
-
-            --划归锚点偏移
-            local p_a = cell_center:getAnchorPoint()
-            local x_a = (0.5 - p_a.x ) *  NODE_PADDING + curSwapBeginCol * NODE_PADDING + self.offsetX
-            local y_a = (0.5 - p_a.y) *  NODE_PADDING + curSwapBeginRow * NODE_PADDING + self.offsetY
-            cell_center:setAnchorPoint(cc.p(0.5,0.5))
-            cell_center:setPosition(cc.p(x_a  , y_a ))
-
+            AnchBack()
+            local row,col = self:getRandC(x, y)
             --进入十字框以内
-            if (x >= cx - padding
+            if ((x >= cx - padding
             and x <= cx + padding)
             or (y >= cy - padding
-            and y <= cy + padding) then
-
-                local row,col = self:getRandC(x, y)
-
+            and y <= cy + padding) )and (row ~= -1 and col ~= -1)  then
+                --防止移动超过一格的情况
+                if row - curSwapBeginRow > 1 then row = curSwapBeginRow + 1 end
+                if curSwapBeginRow - row > 1 then row = curSwapBeginRow - 1 end
+                if col -  curSwapBeginCol > 1 then col = curSwapBeginCol + 1 end
+                if curSwapBeginCol - col  > 1 then col = curSwapBeginCol - 1 end
                 isEnableTouch = false
-                self:swap(row,col,curSwapBeginRow,curSwapBeginCol,
-                    function()
-                        isEnableTouch = true
-                        if self:checkAll() then
-                        self:changeSingedCell(true)
+
+                self:swap(row,col,curSwapBeginRow,curSwapBeginCol,true,function()
+                        self:checkCell(self.grid[row][col])
+                        self:checkCell(self.grid[curSwapBeginRow][curSwapBeginCol])
+                        if self:checkNotClean() then
+                            isEnableTouch = true
+                        else
+                            isEnableTouch = false
+                            self:swap(row,col,curSwapBeginRow,curSwapBeginCol,true,function()
+                                isEnableTouch = true
+                            end)
+
                         end
                     end
                     )
-                cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
             else
-                isEnableTouch = false
-                cell_center:runAction(
-                    transition.sequence({
-                    cc.MoveTo:create(0.4,cc.p(curSwapBeginCol * NODE_PADDING + self.offsetX,curSwapBeginRow * NODE_PADDING + self.offsetY)),
-                    cc.CallFunc:create(function()
-                          isEnableTouch = true
-                    end)
-                }))
-                cell_center:runAction(cc.ScaleTo:create(0.5,CELL_SCALE))
-                return true
+                AnimBack()
+
+                return
             end
         else
             x_vec = (cx - x)/ NODE_PADDING * 0.3 + 0.5
@@ -748,6 +518,7 @@ function Board:onTouch(event, x, y)
             cell_center:setAnchorPoint(cc.p(x_vec,y_vec))
         end
     end
+    
     return true
 end
 
